@@ -166,7 +166,7 @@ std::vector<Option> g_options = {
      "Rays per pixel for the game's ray-traced shadows (menu: Ray-traced shadows, DirectX 12\n"
      "only). The game traces 1: noisy, smeared soft edges that the denoiser has to fill in.\n"
      "2 or 4 give cleaner, steadier soft shadows. Does nothing while the game's own option is\n"
-     "off.",
+     "off. Measured free (under 1%).",
      L"r.RayTracing.Shadow.SamplesPerPixel",
      {{"Game", 0, {}},
       {"2 rays", 2, {{L"r.RayTracing.Shadow.SamplesPerPixel", L"2"}}},
@@ -175,7 +175,8 @@ std::vector<Option> g_options = {
      "Unreal's ray-traced reflections in place of screen-space reflections: mirrors, windows,\n"
      "puddles and shiny floors show what's off screen and behind objects, without the fading\n"
      "at the screen edges. On: surfaces up to 0.6 roughness, one bounce, hard shadows in the\n"
-     "reflection. High: up to 0.8 roughness, two bounces, soft shadows.",
+     "reflection. High: up to 0.8 roughness, two bounces, soft shadows.\n"
+     "Measured about 26% (On) and 28% (High) longer frames.",
      L"r.RayTracing.Reflections",
      {{"Game", 0, {}},
       {"On", 1,
@@ -189,21 +190,19 @@ std::vector<Option> g_options = {
     {kRayTracingTab, "Ray-traced effects (DirectX 12)", "RtAO", "Ray-traced ambient occlusion",
      "Contact darkening in corners, under furniture and around characters traced against the\n"
      "scene instead of estimated from the screen: no halos, and it works for what's hidden or\n"
-     "off screen.",
+     "off screen. Measured about 4% (On) and 7% (2 rays) longer frames.",
      L"r.RayTracing.AmbientOcclusion",
      {{"Game", 0, {}},
       {"On", 1, {{L"r.RayTracing.AmbientOcclusion", L"1"}, {L"r.RayTracing.AmbientOcclusion.SamplesPerPixel", L"1"}}},
       {"High (2 rays)", 2,
        {{L"r.RayTracing.AmbientOcclusion", L"1"}, {L"r.RayTracing.AmbientOcclusion.SamplesPerPixel", L"2"}}}}},
-    {kRayTracingTab, "Ray-traced effects (DirectX 12)", "RtSkyLight", "Ray-traced sky shadows",
-     "Daylight from the sky shadowed by tracing rays: interiors and areas under roofs and\n"
-     "trees darken correctly instead of glowing with flat sky light.",
-     L"r.RayTracing.SkyLight",
-     {{"Game", 0, {}}, {"On", 1, {{L"r.RayTracing.SkyLight", L"1"}}}}},
+    // No ray-traced sky light option: r.RayTracing.SkyLight=1 relights the baked lighting from the
+    // sky and shifts the colours of the whole picture (user, 2026-10-27).
     {kRayTracingTab, "Ray-traced effects (DirectX 12)", "RtGI", "Ray-traced bounce light",
      "Light bouncing off walls and floors traced for real (one bounce). Final gather is the\n"
      "cheaper, steadier method; brute force is more accurate but noisier and much costlier.\n"
-     "The game's baked and screen-space bounce light is replaced while this is on.",
+     "The game's baked and screen-space bounce light is replaced while this is on. Costly:\n"
+     "about 43% (final gather) and 63% (brute force) longer frames.",
      L"r.RayTracing.GlobalIllumination",
      {{"Game", 0, {}},
       {"Final gather", 2, {{L"r.RayTracing.GlobalIllumination", L"2"}}},
@@ -211,7 +210,8 @@ std::vector<Option> g_options = {
        {{L"r.RayTracing.GlobalIllumination", L"1"}, {L"r.RayTracing.GlobalIllumination.MaxBounces", L"1"}}}}},
     {kRayTracingTab, "Ray-traced effects (DirectX 12)", "RtTranslucency", "Ray-traced glass",
      "Glass, bottles and water traced with real refraction and reflections. Usually the\n"
-     "costliest effect here; worth it in scenes with a lot of glass.",
+     "costliest effect here; worth it in scenes with a lot of glass. Measured about 3% in a\n"
+     "scene without much glass.",
      L"r.RayTracing.Translucency",
      {{"Game", 0, {}}, {"On", 1, {{L"r.RayTracing.Translucency", L"1"}}}}},
 
@@ -219,14 +219,14 @@ std::vector<Option> g_options = {
     {"Lighting", "Bounce light and reflections", "Ssgi", "Screen-space bounce light",
      "Unreal's screen-space global illumination: colour bleeding and bounce light from what's\n"
      "on screen, on top of the game's baked lighting. Off in the game; it runs at the\n"
-     "Cinematic quality your menu already sets.",
+     "Cinematic quality your menu already sets. Very costly here: about 83% longer frames.",
      L"r.SSGI.Enable",
      {{"Game", 0, {}},
       {"On", 1, {{L"r.SSGI.Enable", L"1"}}}}},
     {"Lighting", "Bounce light and reflections", "Ao", "Ambient occlusion",
      "The screen-space contact shadows in corners and creases (not used where ray-traced\n"
      "ambient occlusion is on). GTAO: Unreal's newer ground-truth method in place of SSAO\n"
-     "(experimental in 4.25).",
+     "(experimental in 4.25). Free.",
      L"r.AmbientOcclusion.Method",
      {{"Game", 0, {}}, {"GTAO", 2, {{L"r.AmbientOcclusion.Method", L"1"}}}}},
     {"Lighting", "Translucency", "TranslucencyLighting", "Lighting on glass and particles",
@@ -239,7 +239,7 @@ std::vector<Option> g_options = {
      "Resolution of the shadow maps; the game uses 2048 at its highest setting. Higher is\n"
      "sharper and steadier shadow edges, with less shimmer on moving shadows. 8192 applies\n"
      "to the sun and moon only (lamps stay at 4096). Lights covered by the game's ray-traced\n"
-     "shadows don't use shadow maps.",
+     "shadows don't use shadow maps. 4096 is free; 8192 about 4% longer frames.",
      L"r.Shadow.MaxCSMResolution",
      {{"Game", 0, {}},
       {"High (4096)", 4096, {{L"r.Shadow.MaxResolution", L"4096"}, {L"r.Shadow.MaxCSMResolution", L"4096"}}},
@@ -252,7 +252,7 @@ std::vector<Option> g_options = {
       {"Farthest (200%)", 200, {{L"r.Shadow.DistanceScale", L"2"}}}}},
     {"Shadows", "Shadow maps", "ShadowFilter", "Soft shadow filter",
      "Contact-hardening shadows (PCSS, experimental in 4.25): sharp where an object touches\n"
-     "the ground, softer further away, like real shadows.",
+     "the ground, softer further away, like real shadows. About 3% longer frames.",
      L"r.Shadow.FilterMethod",
      {{"Game", 0, {}}, {"Contact-hardening", 1, {{L"r.Shadow.FilterMethod", L"1"}}}}},
     {"Shadows", "Characters", "CapsuleShadows", "Character soft shadows",
@@ -758,25 +758,34 @@ struct QualityPreset {
 
 const QualityPreset kPresets[] = {
     {"Game", "", "The game's own settings: everything below at Game.", {}},
-    // First guess (0.2.0), not measured. The probe showed the menu's highest setting already
-    // maxes view distance (10x), fog, screen-space reflections, TAA quality and small-object
-    // shadows, so those options are gone.
-    {"Ultra+", "",
-     "Everything beyond the menu that should cost little: sharper and longer shadow maps,\n"
-     "full-resolution character shadows and skin, the most detailed characters and models,\n"
-     "finer lighting on translucent effects, 8 anti-aliasing samples, 8 GB textures and 16x\n"
-     "filtering. No extra ray tracing.\n\n"
-     "Not measured in this game yet: use Measure preset costs.",
-     {{"ShadowRes", 4096}, {"ShadowDistance", 150}, {"CapsuleShadows", 1}, {"Skin", 1}, {"CharacterLod", 1},
-      {"TranslucencyLighting", 128}, {"TexturePool", 8192}, {"Anisotropy", 16}, {"MeshDetail", 1}, {"TaaSamples", 8}}},
+    // Measured 2026-10-27 ("Measure each option", RTX 5080, 4K native, DirectX 12, one scene;
+    // Game 9.9 ms / 101 fps; table in docs/FINDINGS.md): everything here measured under 2%
+    // alone; 0.2.0's Ultra+ measured +7% as a whole (Game 9.73 ms, Ultra+ 10.39 ms). 0.2.1 adds
+    // 2-ray RT shadows (+0.3% alone).
+    {"Ultra+", "about 7% slower",
+     "Everything beyond the menu that measured nearly free: cleaner ray-traced shadows (2\n"
+     "rays), sharper and longer shadow maps, full-resolution character shadows and skin, the\n"
+     "most detailed characters and models, finer lighting on translucent effects, 8\n"
+     "anti-aliasing samples, 8 GB textures and 16x filtering.\n\n"
+     "Measured on an RTX 5080 at 4K (DirectX 12) in one scene: 103 fps with Game, 96 with\n"
+     "Ultra+ (about 7% longer frames).",
+     {{"RtShadows", 2}, {"ShadowRes", 4096}, {"ShadowDistance", 150}, {"CapsuleShadows", 1}, {"Skin", 1},
+      {"CharacterLod", 1}, {"TranslucencyLighting", 128}, {"TexturePool", 8192}, {"Anisotropy", 16},
+      {"MeshDetail", 1}, {"TaaSamples", 8}}},
+    // 0.2.0's Cinematic measured +181% (36.6 fps): screen-space bounce light (+83% alone) and RT
+    // sky light (+48%, and it shifts the colours) made it so. 0.2.1: Ultra+ plus RT reflections
+    // (+26%), RT AO (+4%) and 8192 sun shadows (+4%); expected about +40%, not measured yet.
     {"Cinematic", "",
-     "Ultra+ plus ray-traced reflections, ambient occlusion and sky shadows, cleaner\n"
-     "ray-traced shadows (2 rays), screen-space bounce light and the sharpest sun shadows.\n"
-     "The ray-traced parts need the game's DirectX 12 launch option.\n\n"
-     "Not measured in this game yet: use Measure preset costs.",
-     {{"RtShadows", 2}, {"RtReflections", 1}, {"RtAO", 1}, {"RtSkyLight", 1}, {"Ssgi", 1}, {"ShadowRes", 8192},
-      {"ShadowDistance", 150}, {"CapsuleShadows", 1}, {"Skin", 1}, {"CharacterLod", 1}, {"TranslucencyLighting", 128},
-      {"TexturePool", 8192}, {"Anisotropy", 16}, {"MeshDetail", 1}, {"TaaSamples", 8}}},
+     "Ultra+ plus ray-traced reflections (mirrors, windows, puddles and shiny floors show\n"
+     "what's off screen), ray-traced ambient occlusion and the sharpest sun shadows. Needs\n"
+     "the game's DirectX 12 launch option.\n\n"
+     "Leaves out screen-space and ray-traced bounce light (each makes frames about 45-80%\n"
+     "longer here); they stay on their tabs for screenshots.\n\n"
+     "Expected about 40% longer frames than Game (from the per-option costs on an RTX 5080\n"
+     "at 4K); use Measure preset costs.",
+     {{"RtShadows", 2}, {"RtReflections", 1}, {"RtAO", 1}, {"ShadowRes", 8192}, {"ShadowDistance", 150},
+      {"CapsuleShadows", 1}, {"Skin", 1}, {"CharacterLod", 1}, {"TranslucencyLighting", 128}, {"TexturePool", 8192},
+      {"Anisotropy", 16}, {"MeshDetail", 1}, {"TaaSamples", 8}}},
 };
 constexpr int kPresetCount = static_cast<int>(sizeof(kPresets) / sizeof(kPresets[0]));
 
