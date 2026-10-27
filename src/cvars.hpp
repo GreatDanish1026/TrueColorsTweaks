@@ -360,13 +360,20 @@ inline bool HookSinks(const uint8_t* base, void* manager, SinksFn hook, SinksFn*
     *original = reinterpret_cast<SinksFn>(vt[slot]);
     g_vtableCopy[1 + slot] = reinterpret_cast<void*>(hook);
     g_vtableOriginal = vt;
+    // TrueColorsTweaks and TrueColorsDLSS both hook this slot; the second copies the first's vtable,
+    // so its chain runs through the first add-on's code. Pinning keeps every hooked add-on's code
+    // loaded for the rest of the process, whatever order ReShade unloads them in.
+    HMODULE self = nullptr;
+    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+                       reinterpret_cast<LPCWSTR>(hook), &self);
     InterlockedExchangePointer(reinterpret_cast<PVOID volatile*>(manager), &g_vtableCopy[1]);
     return true;
 }
 
+// Puts the vtable back only if ours is still the one in place (nobody hooked on top of us).
 inline void UnhookSinks(void* manager) {
     if (manager && g_vtableOriginal)
-        InterlockedExchangePointer(reinterpret_cast<PVOID volatile*>(manager), g_vtableOriginal);
+        InterlockedCompareExchangePointer(reinterpret_cast<PVOID volatile*>(manager), g_vtableOriginal, &g_vtableCopy[1]);
     g_vtableOriginal = nullptr;
 }
 
