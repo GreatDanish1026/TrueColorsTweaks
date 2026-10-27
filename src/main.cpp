@@ -476,7 +476,7 @@ void FindManager() {
     Log("console manager: singleton %p (RVA 0x%llx, %d of %d matches), manager %p", singleton,
         singleton ? static_cast<unsigned long long>(reinterpret_cast<const uint8_t*>(singleton) - base) : 0ull, votes,
         matches, manager);
-    if (!manager || !cvars::HasModuleVtable(base, manager)) {
+    if (!manager || !cvars::IsConsoleManager(base, manager)) {
         g_liveError = "console manager not found";
         g_live = Live::Failed;
         return;
