@@ -29,6 +29,7 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <dxgi1_4.h>
 
 #define ImTextureID ImU64
 #include <imgui.h>
@@ -142,10 +143,24 @@ struct Option {
 
 constexpr const char* kRayTracingTab = "Ray tracing";
 constexpr const char* kPostTab = "Post-processing";  // taste: in no preset, not measured
+constexpr const char* kHdrTab = "HDR";               // in no preset, not measured
 
 // Every cvar here exists in this exe (checked offline against its strings). Costs and the
 // game's values are filled in from the first probe and measurements (docs/FINDINGS.md).
 std::vector<Option> g_options = {
+    // ------------------------------------------------ HDR (any API; in no preset, not measured)
+    {kHdrTab, "HDR output", "Hdr", "HDR",
+     "The game's own HDR switch only works on DirectX 11, so it can't be had together with\n"
+     "ray tracing. This turns on Unreal's HDR output directly, on DirectX 11 or 12: HDR10\n"
+     "(PQ, Rec. 2020) tone-mapped for a 1000 or 2000 nit display. Windows HDR must be on.\n"
+     "Leave the game's own HDR setting off.",
+     L"r.HDR.EnableHDROutput",
+     {{"Game", 0, {}},
+      {"HDR10, 1000 nits", 1000,
+       {{L"r.HDR.EnableHDROutput", L"1"}, {L"r.HDR.Display.OutputDevice", L"3"}, {L"r.HDR.Display.ColorGamut", L"2"}}},
+      {"HDR10, 2000 nits", 2000,
+       {{L"r.HDR.EnableHDROutput", L"1"}, {L"r.HDR.Display.OutputDevice", L"4"}, {L"r.HDR.Display.ColorGamut", L"2"}}}}},
+
     // ------------------------------------------------ ray tracing (DirectX 12 only)
     {kRayTracingTab, "Ray-traced effects (DirectX 12)", "RtShadows", "Ray-traced shadow quality",
      "Rays per pixel for the game's ray-traced shadows (menu: Ray-traced shadows, DirectX 12\n"
@@ -203,51 +218,32 @@ std::vector<Option> g_options = {
     // ------------------------------------------------ lighting (screen space, any API)
     {"Lighting", "Bounce light and reflections", "Ssgi", "Screen-space bounce light",
      "Unreal's screen-space global illumination: colour bleeding and bounce light from what's\n"
-     "on screen, on top of the game's baked lighting.",
+     "on screen, on top of the game's baked lighting. Off in the game; it runs at the\n"
+     "Cinematic quality your menu already sets.",
      L"r.SSGI.Enable",
      {{"Game", 0, {}},
-      {"On (High)", 3, {{L"r.SSGI.Enable", L"1"}, {L"r.SSGI.Quality", L"3"}}},
-      {"Cinematic", 4, {{L"r.SSGI.Enable", L"1"}, {L"r.SSGI.Quality", L"4"}}}}},
-    {"Lighting", "Bounce light and reflections", "Ssr", "Screen-space reflections",
-     "Quality of the screen-space reflections (not used where ray-traced reflections are on).\n"
-     "Cinematic traces more steps: sharper, less broken-up reflections on floors and water.",
-     L"r.SSR.Quality",
-     {{"Game", 0, {}}, {"Cinematic", 4, {{L"r.SSR.Quality", L"4"}}}}},
+      {"On", 1, {{L"r.SSGI.Enable", L"1"}}}}},
     {"Lighting", "Bounce light and reflections", "Ao", "Ambient occlusion",
      "The screen-space contact shadows in corners and creases (not used where ray-traced\n"
-     "ambient occlusion is on). More levels: all three resolution levels, for wider and\n"
-     "smoother occlusion. GTAO: Unreal's newer ground-truth method (experimental in 4.25).",
-     L"r.AmbientOcclusionLevels",
-     {{"Game", 0, {}},
-      {"More levels", 1, {{L"r.AmbientOcclusionLevels", L"3"}}},
-      {"GTAO", 2, {{L"r.AmbientOcclusion.Method", L"1"}}}}},
-    {"Lighting", "Translucency and fog", "TranslucencyLighting", "Lighting on glass and particles",
+     "ambient occlusion is on). GTAO: Unreal's newer ground-truth method in place of SSAO\n"
+     "(experimental in 4.25).",
+     L"r.AmbientOcclusion.Method",
+     {{"Game", 0, {}}, {"GTAO", 2, {{L"r.AmbientOcclusion.Method", L"1"}}}}},
+    {"Lighting", "Translucency", "TranslucencyLighting", "Lighting on glass and particles",
      "Resolution of the 3D grid that lights translucent things (smoke, particles, some hair\n"
      "and glass). The game uses a 64-cell grid; 128 gives finer, less blotchy lighting.",
      L"r.TranslucencyLightingVolumeDim",
      {{"Game", 0, {}}, {"High (128)", 128, {{L"r.TranslucencyLightingVolumeDim", L"128"}}}}},
-    {"Lighting", "Translucency and fog", "FogCells", "Volumetric fog detail",
-     "Size of the fog's light grid in screen pixels: coarse grids give blocky light shafts and\n"
-     "flicker around lamps. Fine is Unreal's Cinematic setting (4 px, 16 history samples).",
-     L"r.VolumetricFog.GridPixelSize",
-     {{"Game", 0, {}},
-      {"Fine (4 px)", 4,
-       {{L"r.VolumetricFog.GridPixelSize", L"4"}, {L"r.VolumetricFog.GridSizeZ", L"128"},
-        {L"r.VolumetricFog.HistoryMissSupersampleCount", L"16"}}}}},
-
     // ------------------------------------------------ shadows (shadow maps)
     {"Shadows", "Shadow maps", "ShadowRes", "Shadow resolution",
-     "Resolution of the shadow maps. Higher is sharper and steadier shadow edges, with less\n"
-     "shimmer on moving shadows. 8192 applies to the sun and moon only (lamps stay at 4096).",
+     "Resolution of the shadow maps; the game uses 2048 at its highest setting. Higher is\n"
+     "sharper and steadier shadow edges, with less shimmer on moving shadows. 8192 applies\n"
+     "to the sun and moon only (lamps stay at 4096). Lights covered by the game's ray-traced\n"
+     "shadows don't use shadow maps.",
      L"r.Shadow.MaxCSMResolution",
      {{"Game", 0, {}},
       {"High (4096)", 4096, {{L"r.Shadow.MaxResolution", L"4096"}, {L"r.Shadow.MaxCSMResolution", L"4096"}}},
       {"Highest (8192 sun)", 8192, {{L"r.Shadow.MaxResolution", L"4096"}, {L"r.Shadow.MaxCSMResolution", L"8192"}}}}},
-    {"Shadows", "Shadow maps", "ShadowCasters", "Small object shadows",
-     "Smallest object (relative to the screen) that still casts a shadow. All: every object\n"
-     "casts one, so small props stop losing their shadows at a distance.",
-     L"r.Shadow.RadiusThreshold",
-     {{"Game", 0, {}}, {"All objects", 1, {{L"r.Shadow.RadiusThreshold", L"0"}}}}},
     {"Shadows", "Shadow maps", "ShadowDistance", "Shadow distance",
      "How far away the sun and lamps still cast shadows.",
      L"r.Shadow.DistanceScale",
@@ -280,34 +276,29 @@ std::vector<Option> g_options = {
 
     // ------------------------------------------------ detail
     {"Detail", "Textures", "TexturePool", "Texture memory",
-     "Video memory for streamed textures. Unreal's Epic setting keeps 1.5 GB whatever the\n"
-     "card, so textures can go blurry and reload. Free on a 16 GB card.",
+     "Video memory for streamed textures. The game keeps 3 GB at its highest setting\n"
+     "whatever the card, so textures can go blurry and reload. Free on a 16 GB card.",
      L"r.Streaming.PoolSize",
      {{"Game", 0, {}},
       {"4 GB", 4096, {{L"r.Streaming.PoolSize", L"4096"}}},
       {"6 GB", 6144, {{L"r.Streaming.PoolSize", L"6144"}}},
       {"8 GB", 8192, {{L"r.Streaming.PoolSize", L"8192"}}}}},
     {"Detail", "Textures", "Anisotropy", "Anisotropic filtering",
-     "Sharper floors and roads at shallow angles. Unreal's Epic setting uses 8x. Textures\n"
+     "Sharper floors and roads at shallow angles. The game uses 8x. Textures\n"
      "already loaded keep their filtering until they reload (or the game restarts).",
      L"r.MaxAnisotropy",
      {{"Game", 0, {}}, {"16x", 16, {{L"r.MaxAnisotropy", L"16"}}}}},
-    {"Detail", "Distance", "ViewDistance", "Draw distance",
-     "Distance at which objects, foliage and details switch to simpler versions or vanish.",
-     L"r.ViewDistanceScale",
-     {{"Game", 0, {}},
-      {"Far (150%)", 150, {{L"r.ViewDistanceScale", L"1.5"}, {L"foliage.LODDistanceScale", L"1.5"}}},
-      {"Farthest (300%)", 300, {{L"r.ViewDistanceScale", L"3"}, {L"foliage.LODDistanceScale", L"2"}}}}},
     {"Detail", "Distance", "MeshDetail", "Model detail",
      "Distance at which models switch to their simpler versions. Finer keeps the detailed\n"
      "version twice as far.",
      L"r.StaticMeshLODDistanceScale",
      {{"Game", 0, {}}, {"Finer", 1, {{L"r.StaticMeshLODDistanceScale", L"0.5"}}}}},
-    {"Detail", "Image", "TaaQuality", "Anti-aliasing quality",
-     "Quality of the temporal anti-aliasing. Cinematic filters each pixel with more samples:\n"
-     "steadier edges and less flicker on fine detail.",
-     L"r.PostProcessAAQuality",
-     {{"Game", 0, {}}, {"Cinematic", 6, {{L"r.PostProcessAAQuality", L"6"}}}}},
+    {"Detail", "Image", "TaaSamples", "Anti-aliasing samples",
+     "How many jitter positions the temporal anti-aliasing cycles through. Deck Nine lowered\n"
+     "it to 4 (Unreal's default is 8): fewer positions leave stair steps and shimmer on thin\n"
+     "edges, hair and foliage. 8 gives smoother, steadier edges.",
+     L"r.TemporalAASamples",
+     {{"Game", 0, {}}, {"8 (Unreal default)", 8, {{L"r.TemporalAASamples", L"8"}}}}},
 
     // ------------------------------------------------ post-processing (taste; in no preset)
     {kPostTab, "Camera", "FilmGrain", "Film grain",
@@ -326,10 +317,10 @@ std::vector<Option> g_options = {
     {kPostTab, "Camera", "Fringe", "Chromatic aberration", "Colour fringes at the screen edges.",
      L"r.SceneColorFringeQuality", {{"Game", 0, {}}, {"Off", 1, {{L"r.SceneColorFringeQuality", L"0"}}}}},
     {kPostTab, "Image", "Sharpen", "Sharpening",
-     "The tonemapper's sharpening filter, for a crisper image (stronger values can halo).",
+     "The tonemapper's sharpening filter. The game uses 0.5; Strong is crisper but can halo.",
      L"r.Tonemapper.Sharpen",
      {{"Game", 0, {}},
-      {"Light (0.5)", 5, {{L"r.Tonemapper.Sharpen", L"0.5"}}},
+      {"Off", 1, {{L"r.Tonemapper.Sharpen", L"0"}}},
       {"Strong (1.0)", 10, {{L"r.Tonemapper.Sharpen", L"1"}}}}},
 };
 
@@ -767,24 +758,25 @@ struct QualityPreset {
 
 const QualityPreset kPresets[] = {
     {"Game", "", "The game's own settings: everything below at Game.", {}},
+    // First guess (0.2.0), not measured. The probe showed the menu's highest setting already
+    // maxes view distance (10x), fog, screen-space reflections, TAA quality and small-object
+    // shadows, so those options are gone.
     {"Ultra+", "",
-     "Everything beyond the menu that should cost little: sharper shadows from more objects\n"
-     "and further away, full-resolution character shadows and skin, finer fog, cinematic\n"
-     "screen-space reflections and anti-aliasing, 8 GB textures, 16x filtering, more draw\n"
-     "distance and model detail. No ray tracing.\n\n"
+     "Everything beyond the menu that should cost little: sharper and longer shadow maps,\n"
+     "full-resolution character shadows and skin, the most detailed characters and models,\n"
+     "finer lighting on translucent effects, 8 anti-aliasing samples, 8 GB textures and 16x\n"
+     "filtering. No extra ray tracing.\n\n"
      "Not measured in this game yet: use Measure preset costs.",
-     {{"Ssr", 4}, {"ShadowRes", 4096}, {"ShadowCasters", 1}, {"ShadowDistance", 150}, {"CapsuleShadows", 1},
-      {"Skin", 1}, {"TranslucencyLighting", 128}, {"FogCells", 4}, {"TexturePool", 8192}, {"Anisotropy", 16},
-      {"ViewDistance", 150}, {"MeshDetail", 1}, {"TaaQuality", 6}}},
+     {{"ShadowRes", 4096}, {"ShadowDistance", 150}, {"CapsuleShadows", 1}, {"Skin", 1}, {"CharacterLod", 1},
+      {"TranslucencyLighting", 128}, {"TexturePool", 8192}, {"Anisotropy", 16}, {"MeshDetail", 1}, {"TaaSamples", 8}}},
     {"Cinematic", "",
      "Ultra+ plus ray-traced reflections, ambient occlusion and sky shadows, cleaner\n"
      "ray-traced shadows (2 rays), screen-space bounce light and the sharpest sun shadows.\n"
      "The ray-traced parts need the game's DirectX 12 launch option.\n\n"
      "Not measured in this game yet: use Measure preset costs.",
-     {{"RtShadows", 2}, {"RtReflections", 1}, {"RtAO", 1}, {"RtSkyLight", 1}, {"Ssgi", 3}, {"Ssr", 4},
-      {"ShadowRes", 8192}, {"ShadowCasters", 1}, {"ShadowDistance", 150}, {"CapsuleShadows", 1}, {"Skin", 1},
-      {"TranslucencyLighting", 128}, {"FogCells", 4}, {"TexturePool", 8192}, {"Anisotropy", 16}, {"ViewDistance", 150},
-      {"MeshDetail", 1}, {"TaaQuality", 6}}},
+     {{"RtShadows", 2}, {"RtReflections", 1}, {"RtAO", 1}, {"RtSkyLight", 1}, {"Ssgi", 1}, {"ShadowRes", 8192},
+      {"ShadowDistance", 150}, {"CapsuleShadows", 1}, {"Skin", 1}, {"CharacterLod", 1}, {"TranslucencyLighting", 128},
+      {"TexturePool", 8192}, {"Anisotropy", 16}, {"MeshDetail", 1}, {"TaaSamples", 8}}},
 };
 constexpr int kPresetCount = static_cast<int>(sizeof(kPresets) / sizeof(kPresets[0]));
 
@@ -877,7 +869,7 @@ void ApplyStage(const Stage& st) {
 }
 
 bool Measurable(const Option& o) {
-    if (!strcmp(o.tab, kPostTab)) return false;
+    if (!strcmp(o.tab, kPostTab) || !strcmp(o.tab, kHdrTab)) return false;
     if (!strcmp(o.tab, kRayTracingTab)) return OnDirectX12() && g_rayTracing.load() == 1;
     return true;
 }
@@ -1039,6 +1031,64 @@ void RayTracingOnPresent() {
 
 // ---------------------------------------------------------------- present
 
+// ---------------------------------------------------------------- HDR colour space
+//
+// With r.HDR.EnableHDROutput the engine writes PQ (Rec. 2020) into its 10-bit back buffer and
+// should tell DXGI so (SetColorSpace1). If the swap chain still isn't HDR10 two seconds after the
+// HDR option went on (the game turned HDR off on DirectX 12, which may include that step), the
+// add-on sets the colour space itself, and puts sRGB back when the option goes off. ReShade
+// doesn't see a change made this way, so its own overlay may look dim while it's in effect.
+
+ULONGLONG g_hdrSince = 0;  // when the HDR option went on (0 = off)
+bool g_hdrOurs = false;    // we set HDR10 on the swap chain ourselves
+std::string g_hdrStatus = "off";
+
+bool SetSwapchainColorSpace(swapchain* sc, DXGI_COLOR_SPACE_TYPE cs) {
+    auto native = reinterpret_cast<IUnknown*>(sc->get_native());
+    IDXGISwapChain3* sc3 = nullptr;
+    if (!native || FAILED(native->QueryInterface(IID_PPV_ARGS(&sc3))) || !sc3) return false;
+    UINT support = 0;
+    bool ok = SUCCEEDED(sc3->CheckColorSpaceSupport(cs, &support)) &&
+              (support & DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT) && SUCCEEDED(sc3->SetColorSpace1(cs));
+    sc3->Release();
+    return ok;
+}
+
+void HdrOnPresent(swapchain* sc) {
+    const Option* o = FindOption("Hdr");
+    const bool want = o && o->value && g_enabled && g_live.load() == Live::Ready;
+    const ULONGLONG now = GetTickCount64();
+    if (!want) {
+        g_hdrSince = 0;
+        if (g_hdrOurs) {
+            const bool ok = SetSwapchainColorSpace(sc, DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709);
+            Log("HDR off: swap chain colour space back to sRGB %s", ok ? "done" : "FAILED");
+            g_hdrOurs = false;
+        }
+        g_hdrStatus = "off";
+        return;
+    }
+    if (!g_hdrSince) g_hdrSince = now;
+    if (sc->get_color_space() == color_space::hdr10_pq && !g_hdrOurs) {
+        g_hdrStatus = "HDR10, set by the game";
+        return;
+    }
+    if (g_hdrOurs || now < g_hdrSince + 2000) return;
+    const format f = sc->get_device()->get_resource_desc(sc->get_current_back_buffer()).texture.format;
+    if (f != format::r10g10b10a2_unorm && f != format::b10g10r10a2_unorm) {
+        static format logged = format::unknown;
+        if (logged != f) Log("HDR: back buffer is format %u, not 10-bit; can't switch it to HDR10", static_cast<uint32_t>(f));
+        logged = f;
+        g_hdrStatus = "not possible: the back buffer isn't 10-bit";
+        return;
+    }
+    g_hdrOurs = SetSwapchainColorSpace(sc, DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020);
+    Log("HDR: the game left the swap chain in %s; set HDR10 ourselves: %s",
+        sc->get_color_space() == color_space::srgb ? "sRGB" : "another colour space", g_hdrOurs ? "done" : "FAILED");
+    g_hdrStatus = g_hdrOurs ? "HDR10, set by " DT_PRODUCT : "the display refused HDR10 (is Windows HDR on?)";
+    if (!g_hdrOurs) g_hdrSince = now + 60000;  // try again in a minute
+}
+
 color_space g_colorSpace = color_space::unknown;
 bool g_keyWasDown = false;
 
@@ -1073,6 +1123,7 @@ void OnPresent(command_queue*, swapchain* sc, const rect*, const rect*, uint32_t
     FrameOnPresent(focused);
     RayTracingOnPresent();
     LiveOnPresent();
+    HdrOnPresent(sc);
 }
 
 // ---------------------------------------------------------------- overlay
@@ -1193,6 +1244,8 @@ void DrawAdvanced(const View& view) {
         ImGui::PopTextWrapPos();
     }
     ImGui::TextDisabled("Graphics API: %s; r.RayTracing = %d", ApiName(), g_rayTracing.load());
+    ImGui::TextDisabled("HDR: %s (swap chain %s)", g_hdrStatus.c_str(),
+                        g_colorSpace == color_space::hdr10_pq ? "HDR10" : g_colorSpace == color_space::srgb ? "sRGB" : "other");
     ImGui::TextDisabled("Hardware ray tracing: %s (%llu structure builds, %llu ray dispatches per second)",
                         g_asPerSec || g_raysPerSec ? "active" : "not in use", g_asPerSec, g_raysPerSec);
     ImGui::TextDisabled("Log: " DT_PRODUCT ".log next to the game's exe");
