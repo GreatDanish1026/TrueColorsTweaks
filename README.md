@@ -1,4 +1,4 @@
-# TrueColorsTweaks 0.2.4
+# TrueColorsTweaks 1.0.0
 
 Graphics add-on for **Life is Strange: True Colors** (PC, Steam), for ReShade with add-on support.
 Raises the game's lighting, shadow and detail settings beyond what its menu offers, adds Unreal's

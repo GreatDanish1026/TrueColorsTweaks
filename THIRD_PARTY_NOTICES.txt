@@ -1,7 +1,7 @@
 Third-party notices
 ===================
 
-DoubleExposureTweaks.addon64 is compiled against the following headers, which are
+TrueColorsTweaks.addon64 is compiled against the following headers, which are
 included in the source repository under third_party/.
 
 ----------------------------------------------------------------------------
