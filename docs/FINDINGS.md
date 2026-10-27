@@ -107,7 +107,8 @@ Game 9.90 ms (101 fps) at the start and 9.89 ms at the end.
 Presets as a whole (0.2.0): Game 9.73 ms (102.8 fps), Ultra+ 10.39 ms (96.3 fps, **+7%**),
 Cinematic 27.33 ms (36.6 fps, +181%, with SSGI and RT sky light). 0.2.1 rebuilds Cinematic as
 Ultra+ plus RT reflections, RT AO and 8192 sun shadows (expected about +40%, to be measured) and
-adds 2-ray RT shadows to Ultra+.
+adds 2-ray RT shadows to Ultra+. Measured 0.2.1 (same kind of scene): Game 8.58 ms (117 fps),
+Ultra+ 9.27 ms (**+8%**), Cinematic 12.78 ms (78 fps, **+49%**).
 
 ## RT sky light shifts the colours
 
